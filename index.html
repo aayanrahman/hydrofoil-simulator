@@ -1,1414 +1,404 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="en">
 <head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Hydrofoil Active Flight Controller — Simulator</title>
+<meta charset="utf-8" />
+<title>Hydrofoil Sim</title>
 <style>
   :root {
-    --bg-deep:    #060e18;
-    --bg-panel:   #0c1626;
-    --bg-panel-2: #122036;
-    --border:     #1e3552;
-    --border-2:   #2a4a72;
-    --text:       #d8e6f7;
-    --text-mid:   #93afd1;
-    --text-dim:   #5d7a9c;
-    --cyan:       #2bd6ff;
-    --green:      #5dffb1;
-    --amber:      #ffb547;
-    --red:        #ff5e6c;
-    --purple:     #b58cff;
-    --magenta:    #ff7ad9;
-    --grid:       #15243a;
-    --grid-dim:   #0f1c2e;
+    --bg: #0b0f14;
+    --panel: #111821;
+    --line: #1f2a37;
+    --fg: #cfd8e3;
+    --dim: #6b7a8a;
+    --accent: #6ad0ff;
+    --warn: #ffb454;
+    --ok: #7ee787;
   }
   * { box-sizing: border-box; }
-  html, body { height: 100%; margin: 0; }
-  body {
-    background:
-      radial-gradient(ellipse at top, #0a172a 0%, var(--bg-deep) 60%),
-      var(--bg-deep);
-    color: var(--text);
-    font-family: 'Inter', 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
-    font-size: 12.5px;
-    letter-spacing: 0.01em;
-    overflow: hidden;
-    height: 100vh;
-    display: flex;
-    flex-direction: column;
+  html, body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--fg);
+    font: 13px/1.4 ui-monospace, Menlo, Consolas, monospace;
   }
-  .mono {
-    font-family: 'JetBrains Mono', 'SF Mono', Menlo, Consolas, monospace;
-    font-variant-numeric: tabular-nums;
-  }
-
-  /* ---------- HEADER ---------- */
-  header.topbar {
-    display: flex;
-    align-items: center;
-    gap: 16px;
-    padding: 8px 16px;
-    background: linear-gradient(180deg, var(--bg-panel) 0%, var(--bg-deep) 100%);
-    border-bottom: 1px solid var(--border);
-    height: 50px;
-    flex-shrink: 0;
-  }
-  .brand {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-  .brand-mark {
-    width: 26px; height: 26px;
-    border: 1.5px solid var(--cyan);
-    border-radius: 4px;
-    position: relative;
-    background: rgba(43,214,255,0.06);
-  }
-  .brand-mark::before, .brand-mark::after {
-    content: ''; position: absolute; background: var(--cyan);
-  }
-  .brand-mark::before { left: 4px; right: 4px; top: 50%; height: 1.5px; transform: translateY(-50%); }
-  .brand-mark::after  { top: 4px; bottom: 4px; left: 50%; width: 1.5px; transform: translateX(-50%); }
-  .brand-text { line-height: 1.1; }
-  .brand-title {
-    font-weight: 600;
-    font-size: 13px;
-    color: var(--text);
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-  .brand-sub {
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-  }
-
-  .status-pills { display: flex; gap: 8px; margin-left: 8px; }
-  .pill {
-    display: inline-flex; align-items: center; gap: 6px;
-    padding: 4px 10px;
-    border: 1px solid var(--border-2);
-    border-radius: 100px;
-    font-size: 10.5px;
-    letter-spacing: 0.16em;
-    text-transform: uppercase;
-    color: var(--text-dim);
-    background: rgba(255,255,255,0.02);
-  }
-  .pill .dot { width: 6px; height: 6px; border-radius: 50%; background: var(--text-dim); }
-  .pill.active { color: var(--text); border-color: currentColor; background: rgba(43,214,255,0.07); }
-  .pill.active.foil   { color: var(--green); }
-  .pill.active.trans  { color: var(--amber); }
-  .pill.active.hull   { color: var(--cyan); }
-  .pill.active .dot   { background: currentColor; box-shadow: 0 0 8px currentColor; }
-
-  .header-spacer { flex: 1; }
-
-  .header-meta {
-    display: flex; gap: 18px; align-items: center;
-    color: var(--text-dim); font-size: 11px;
-    letter-spacing: 0.1em; text-transform: uppercase;
-  }
-  .header-meta b { color: var(--text); font-weight: 500; }
-  .clock { color: var(--cyan); }
-
-  /* ---------- LAYOUT ---------- */
-  main.workspace {
-    flex: 1;
+  .wrap {
+    max-width: 980px;
+    margin: 0 auto;
+    padding: 16px;
     display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: 1fr auto;
-    gap: 1px;
-    background: var(--border);
-    overflow: hidden;
-    min-height: 0;
+    grid-template-columns: 1fr;
+    gap: 12px;
   }
   .panel {
-    background: var(--bg-deep);
-    position: relative;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
+    background: var(--panel);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    padding: 10px 12px;
   }
-  .panel-header {
-    display: flex; align-items: center; justify-content: space-between;
+  h1 {
+    margin: 0 0 4px;
+    font-size: 13px;
+    letter-spacing: 2px;
+    color: var(--dim);
+    font-weight: 600;
+  }
+  canvas { display: block; width: 100%; }
+  #scene { height: 280px; background: #07101a; border-radius: 3px; }
+  #chart { height: 160px; background: #07101a; border-radius: 3px; }
+  .row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+  .stat { display: flex; flex-direction: column; min-width: 110px; }
+  .stat .k { color: var(--dim); font-size: 11px; letter-spacing: 1px; }
+  .stat .v { color: var(--fg); font-size: 15px; font-variant-numeric: tabular-nums; }
+  .badge {
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-weight: 700;
+    letter-spacing: 1.5px;
+    font-size: 12px;
+    border: 1px solid currentColor;
+  }
+  .badge.hull { color: var(--warn); }
+  .badge.foil { color: var(--ok); }
+  button {
+    background: transparent;
+    color: var(--fg);
+    border: 1px solid var(--line);
     padding: 8px 14px;
-    border-bottom: 1px solid var(--border);
-    background: var(--bg-panel);
-    flex-shrink: 0;
-  }
-  .panel-title {
-    font-size: 10.5px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--text-mid);
-    display: flex; align-items: center; gap: 8px;
-  }
-  .panel-title::before {
-    content: '';
-    width: 4px; height: 12px;
-    background: var(--cyan);
-    box-shadow: 0 0 6px rgba(43,214,255,0.5);
-  }
-  .panel-actions { display: flex; gap: 8px; }
-
-  .canvas-wrap { flex: 1; position: relative; min-height: 0; }
-  canvas { display: block; width: 100%; height: 100%; }
-
-  /* HUD overlay over boat panel */
-  .hud {
-    position: absolute; inset: 0;
-    pointer-events: none;
-    padding: 12px;
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    grid-template-rows: auto 1fr auto;
-    gap: 10px;
-    font-size: 11px;
-  }
-  .hud-cell {
-    border: 1px solid var(--border-2);
-    background: rgba(7,16,28,0.7);
-    backdrop-filter: blur(2px);
-    padding: 6px 10px;
-    border-radius: 2px;
-  }
-  .hud-cell .lbl {
-    color: var(--text-dim);
-    font-size: 9.5px;
-    letter-spacing: 0.18em;
-    text-transform: uppercase;
-  }
-  .hud-cell .val {
-    color: var(--text);
-    font-size: 18px;
-    font-weight: 500;
-    margin-top: 2px;
-  }
-  .hud-cell .val .unit {
-    font-size: 10px; color: var(--text-dim);
-    margin-left: 4px; letter-spacing: 0.1em;
-  }
-  .hud-cell.cyan .val { color: var(--cyan); }
-  .hud-cell.green .val { color: var(--green); }
-  .hud-cell.amber .val { color: var(--amber); }
-  .hud-cell.tr   { justify-self: end; }
-  .hud-row-bottom { grid-column: 1 / -1; display: flex; gap: 10px; }
-  .hud-row-bottom .hud-cell { flex: 1; }
-
-  /* ---------- CONTROLS ---------- */
-  .controls {
-    grid-column: 1 / -1;
-    background: var(--bg-panel);
-    border-top: 1px solid var(--border);
-    padding: 14px 18px 16px;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr) auto;
-    gap: 16px 22px;
-    align-items: start;
-  }
-  .control-group {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    border-left: 1px solid var(--border);
-    padding-left: 16px;
-  }
-  .control-group:first-child { border-left: none; padding-left: 0; }
-  .group-title {
-    font-size: 10px;
-    letter-spacing: 0.22em;
-    text-transform: uppercase;
-    color: var(--text-mid);
-    margin-bottom: 2px;
-    display: flex; align-items: center; gap: 8px;
-  }
-  .group-title .badge {
-    font-size: 9px; color: var(--bg-deep); background: var(--cyan);
-    padding: 1px 6px; border-radius: 2px; letter-spacing: 0.1em;
-  }
-  .group-title .badge.purple { background: var(--purple); }
-  .group-title .badge.amber { background: var(--amber); }
-  .group-title .badge.green { background: var(--green); }
-
-  .slider {
-    display: grid;
-    grid-template-columns: 60px 1fr 70px;
-    align-items: center;
-    gap: 10px;
-    font-size: 11px;
-  }
-  .slider .lab { color: var(--text-dim); letter-spacing: 0.08em; text-transform: uppercase; font-size: 10.5px; }
-  .slider .val { color: var(--cyan); text-align: right; font-size: 11.5px; }
-  .slider input[type="range"] {
-    -webkit-appearance: none;
-    width: 100%;
-    height: 4px;
-    background: linear-gradient(90deg, var(--border-2), var(--border-2));
-    border-radius: 2px;
-    outline: none;
+    font: inherit;
+    letter-spacing: 1.5px;
     cursor: pointer;
+    border-radius: 3px;
   }
-  .slider input[type="range"]::-webkit-slider-thumb {
-    -webkit-appearance: none;
-    appearance: none;
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--cyan);
-    box-shadow: 0 0 6px rgba(43,214,255,0.6);
-    cursor: pointer;
-    border: 2px solid var(--bg-deep);
-  }
-  .slider input[type="range"]::-moz-range-thumb {
-    width: 12px; height: 12px;
-    border-radius: 50%;
-    background: var(--cyan);
-    border: 2px solid var(--bg-deep);
-    box-shadow: 0 0 6px rgba(43,214,255,0.6);
-    cursor: pointer;
-  }
-
-  .btn-row { display: flex; flex-wrap: wrap; gap: 6px; }
-  button.btn {
-    background: var(--bg-panel-2);
-    color: var(--text);
-    border: 1px solid var(--border-2);
-    padding: 6px 12px;
-    font-size: 10.5px;
-    letter-spacing: 0.14em;
-    text-transform: uppercase;
-    cursor: pointer;
-    border-radius: 2px;
-    transition: all 0.12s ease;
-    font-family: inherit;
-  }
-  button.btn:hover {
-    border-color: var(--cyan);
-    color: var(--cyan);
-    background: rgba(43,214,255,0.05);
-  }
-  button.btn.primary {
-    background: rgba(43,214,255,0.12);
-    border-color: var(--cyan);
-    color: var(--cyan);
-  }
-  button.btn.primary:hover { background: rgba(43,214,255,0.22); }
-  button.btn.amber { color: var(--amber); border-color: var(--amber); }
-  button.btn.amber:hover { background: rgba(255,181,71,0.1); }
-  button.btn.red   { color: var(--red); border-color: var(--red); }
-  button.btn.red:hover { background: rgba(255,94,108,0.1); }
-  button.btn.green { color: var(--green); border-color: var(--green); }
-  button.btn.green:hover { background: rgba(93,255,177,0.1); }
-
-  .legend {
-    display: flex; flex-wrap: wrap; gap: 14px;
-    font-size: 10.5px; color: var(--text-dim);
-    letter-spacing: 0.1em; text-transform: uppercase;
-  }
-  .legend .item { display: inline-flex; align-items: center; gap: 6px; }
-  .legend .swatch {
-    width: 18px; height: 2px;
-    background: currentColor;
-    box-shadow: 0 0 4px currentColor;
-  }
-  .legend .swatch.dashed {
-    background: linear-gradient(90deg, currentColor 50%, transparent 50%);
-    background-size: 4px 100%;
-    box-shadow: none;
-  }
-
-  .chart-meta {
-    position: absolute; top: 8px; right: 12px;
-    font-size: 9.5px; color: var(--text-dim);
-    letter-spacing: 0.18em; text-transform: uppercase;
-    pointer-events: none;
-  }
-  .chart-tag {
-    position: absolute;
-    left: 12px;
-    font-size: 9.5px; color: var(--text-dim);
-    letter-spacing: 0.18em; text-transform: uppercase;
-    pointer-events: none;
-  }
-
-  /* scrollbar polish */
-  ::-webkit-scrollbar { width: 8px; height: 8px; }
-  ::-webkit-scrollbar-track { background: var(--bg-deep); }
-  ::-webkit-scrollbar-thumb { background: var(--border-2); border-radius: 4px; }
+  button:hover { border-color: var(--accent); color: var(--accent); }
+  .legend { color: var(--dim); font-size: 11px; }
+  .legend .sw { display: inline-block; width: 10px; height: 2px; vertical-align: middle; margin-right: 4px; }
+  .ctrl { display: flex; flex-direction: column; gap: 4px; min-width: 200px; }
+  .ctrl .lbl { display: flex; justify-content: space-between; color: var(--dim); font-size: 11px; letter-spacing: 1px; }
+  .ctrl .lbl .val { color: var(--fg); font-variant-numeric: tabular-nums; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
 </style>
 </head>
 <body>
+<div class="wrap">
+  <div class="panel">
+    <h1>HYDROFOIL FLIGHT CONTROLLER</h1>
+    <canvas id="scene"></canvas>
+  </div>
 
-<header class="topbar">
-  <div class="brand">
-    <div class="brand-mark"></div>
-    <div class="brand-text">
-      <div class="brand-title">Hydrofoil&nbsp;FCS</div>
-      <div class="brand-sub">Active Flight Controller · Sim v1.0</div>
+  <div class="panel row" style="justify-content: space-between;">
+    <div class="row">
+      <div class="stat"><span class="k">HEIGHT</span><span class="v" id="vH">0.00 m</span></div>
+      <div class="stat"><span class="k">TARGET</span><span class="v">0.50 m</span></div>
+      <div class="stat"><span class="k">FOIL ANGLE</span><span class="v" id="vA">0.0&deg;</span></div>
+      <div class="stat"><span class="k">LIFT</span><span class="v" id="vL">0 N</span></div>
+      <div class="stat"><span class="k">SPEED</span><span class="v">15.0 m/s</span></div>
+    </div>
+    <div class="row">
+      <span id="status" class="badge hull">HULL-BORNE</span>
+      <button id="btnDisturb">DISTURB</button>
+      <button id="btnReset">RESET</button>
     </div>
   </div>
 
-  <div class="status-pills">
-    <div class="pill" id="pill-hull"><span class="dot"></span>Hull&#8209;Borne</div>
-    <div class="pill" id="pill-trans"><span class="dot"></span>Transitioning</div>
-    <div class="pill" id="pill-foil"><span class="dot"></span>Foilborne</div>
+  <div class="panel row" style="gap: 24px;">
+    <div class="ctrl">
+      <div class="lbl"><span>WAVE AMPLITUDE</span><span class="val" id="wAmpV">0.00 m</span></div>
+      <input type="range" id="wAmp" min="0" max="0.3" step="0.01" value="0">
+    </div>
+    <div class="ctrl">
+      <div class="lbl"><span>WAVE FREQUENCY</span><span class="val" id="wFreqV">0.50 Hz</span></div>
+      <input type="range" id="wFreq" min="0.1" max="1" step="0.05" value="0.5">
+    </div>
   </div>
 
-  <div class="header-spacer"></div>
-
-  <div class="header-meta mono">
-    <div>SIM&nbsp;<b id="sim-time">00:00.00</b></div>
-    <div>RATE&nbsp;<b id="sim-rate">200 Hz</b></div>
-    <div class="clock" id="wallclock">—</div>
+  <div class="panel">
+    <div class="row" style="justify-content: space-between; margin-bottom: 6px;">
+      <span class="legend"><span class="sw" style="background: var(--accent)"></span>HEIGHT &nbsp; <span class="sw" style="background: var(--warn)"></span>TARGET</span>
+      <span class="legend">10 s window</span>
+    </div>
+    <canvas id="chart"></canvas>
   </div>
-</header>
-
-<main class="workspace">
-
-  <!-- LEFT: Boat visualization -->
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-title">Side&nbsp;View · Vehicle &amp; Sea State</div>
-      <div class="panel-actions mono" style="font-size:10px;color:var(--text-dim);letter-spacing:.16em;text-transform:uppercase;">
-        Scale 1:25
-      </div>
-    </div>
-    <div class="canvas-wrap">
-      <canvas id="boat-canvas"></canvas>
-      <div class="hud">
-        <div class="hud-cell green">
-          <div class="lbl">Height&nbsp;h</div>
-          <div class="val mono"><span id="hud-h">0.00</span><span class="unit">m</span></div>
-        </div>
-        <div class="hud-cell cyan tr">
-          <div class="lbl">Pitch&nbsp;θ</div>
-          <div class="val mono"><span id="hud-theta">0.0</span><span class="unit">°</span></div>
-        </div>
-        <div></div><div></div>
-        <div class="hud-row-bottom">
-          <div class="hud-cell">
-            <div class="lbl">Vertical&nbsp;Vel</div>
-            <div class="val mono" style="font-size:14px;"><span id="hud-hdot">0.00</span><span class="unit">m/s</span></div>
-          </div>
-          <div class="hud-cell amber">
-            <div class="lbl">Foil&nbsp;α</div>
-            <div class="val mono" style="font-size:14px;"><span id="hud-alpha">0.0</span><span class="unit">°</span></div>
-          </div>
-          <div class="hud-cell">
-            <div class="lbl">Lift</div>
-            <div class="val mono" style="font-size:14px;"><span id="hud-lift">0.0</span><span class="unit">kN</span></div>
-          </div>
-          <div class="hud-cell">
-            <div class="lbl">Speed</div>
-            <div class="val mono" style="font-size:14px;"><span id="hud-speed">0.0</span><span class="unit">m/s</span></div>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
-  <!-- RIGHT: Charts -->
-  <section class="panel">
-    <div class="panel-header">
-      <div class="panel-title">Telemetry · Last 10&nbsp;s</div>
-      <div class="legend" id="legend">
-        <span class="item" style="color:var(--green);"><span class="swatch"></span>Height</span>
-        <span class="item" style="color:var(--text-mid);"><span class="swatch dashed"></span>Target</span>
-        <span class="item" style="color:var(--amber);"><span class="swatch"></span>α&nbsp;Foil</span>
-        <span class="item" style="color:var(--cyan);"><span class="swatch"></span>P</span>
-        <span class="item" style="color:var(--magenta);"><span class="swatch"></span>I</span>
-        <span class="item" style="color:var(--purple);"><span class="swatch"></span>D</span>
-      </div>
-    </div>
-    <div class="canvas-wrap">
-      <canvas id="chart-canvas"></canvas>
-    </div>
-  </section>
-
-  <!-- CONTROLS PANEL (full width) -->
-  <section class="controls">
-
-    <div class="control-group">
-      <div class="group-title">PID&nbsp;Gains <span class="badge">Controller</span></div>
-      <div class="slider">
-        <div class="lab">Kp</div>
-        <input type="range" id="kp" min="0"   max="40" step="0.1" value="9.0">
-        <div class="val mono" id="kp-val">9.0</div>
-      </div>
-      <div class="slider">
-        <div class="lab">Ki</div>
-        <input type="range" id="ki" min="0"   max="20" step="0.1" value="4.0">
-        <div class="val mono" id="ki-val">4.0</div>
-      </div>
-      <div class="slider">
-        <div class="lab">Kd</div>
-        <input type="range" id="kd" min="0"   max="20" step="0.1" value="6.0">
-        <div class="val mono" id="kd-val">6.0</div>
-      </div>
-    </div>
-
-    <div class="control-group">
-      <div class="group-title">Vehicle <span class="badge amber">Plant</span></div>
-      <div class="slider">
-        <div class="lab">Speed</div>
-        <input type="range" id="speed" min="5" max="18" step="0.1" value="14">
-        <div class="val mono" id="speed-val">14.0&nbsp;m/s</div>
-      </div>
-      <div class="slider">
-        <div class="lab">Target&nbsp;h</div>
-        <input type="range" id="target" min="0.1" max="0.8" step="0.01" value="0.40">
-        <div class="val mono" id="target-val">0.40&nbsp;m</div>
-      </div>
-    </div>
-
-    <div class="control-group">
-      <div class="group-title">Sea&nbsp;State <span class="badge purple">Disturbance</span></div>
-      <div class="slider">
-        <div class="lab">Wave&nbsp;A</div>
-        <input type="range" id="wave-amp" min="0" max="1.5" step="0.01" value="0.15">
-        <div class="val mono" id="wave-amp-val">0.15&nbsp;m/s</div>
-      </div>
-      <div class="slider">
-        <div class="lab">Wave&nbsp;f</div>
-        <input type="range" id="wave-freq" min="0.1" max="2.0" step="0.01" value="0.6">
-        <div class="val mono" id="wave-freq-val">0.60&nbsp;Hz</div>
-      </div>
-      <div class="btn-row">
-        <button class="btn amber" id="btn-disturb">Inject&nbsp;Disturbance</button>
-      </div>
-    </div>
-
-    <div class="control-group">
-      <div class="group-title">Tuning&nbsp;Presets <span class="badge green">Demo</span></div>
-      <div class="btn-row">
-        <button class="btn green" data-preset="stable">Stable&nbsp;Tune</button>
-        <button class="btn amber" data-preset="under">Underdamped</button>
-        <button class="btn red"   data-preset="unstable">Unstable</button>
-      </div>
-      <div class="btn-row" style="margin-top:6px;">
-        <button class="btn primary" id="btn-pause">Pause</button>
-        <button class="btn" id="btn-reset">Reset</button>
-      </div>
-    </div>
-
-    <div class="control-group" style="min-width:170px;">
-      <div class="group-title">Live&nbsp;Readout</div>
-      <div class="mono" style="line-height:1.7;font-size:11px;color:var(--text-mid);">
-        <div>L&nbsp;&nbsp;<b id="r-lift" style="color:var(--text);">0.000</b>&nbsp;kN</div>
-        <div>D&nbsp;&nbsp;<b id="r-drag" style="color:var(--text);">0.000</b>&nbsp;kN</div>
-        <div>P&nbsp;&nbsp;<b id="r-p"    style="color:var(--cyan);">0.00</b>°</div>
-        <div>I&nbsp;&nbsp;<b id="r-i"    style="color:var(--magenta);">0.00</b>°</div>
-        <div>D&nbsp;&nbsp;<b id="r-d"    style="color:var(--purple);">0.00</b>°</div>
-      </div>
-    </div>
-
-  </section>
-</main>
+</div>
 
 <script>
-/* =========================================================================
-   HYDROFOIL ACTIVE FLIGHT CONTROLLER · Vanilla JS Simulator
-   - RK4 plant @ 200 Hz, render @ 60 fps
-   - PID with anti-windup + filtered derivative
-   ========================================================================= */
-'use strict';
+"use strict";
 
-// ----- Constants -----
-const RHO   = 1025;     // kg/m^3 seawater
-const G     = 9.81;     // m/s^2
-const M     = 800;      // kg
-const I_YY  = 600;      // kg m^2
-const A_FOIL= 0.30;     // m^2
-const CL    = 1.20;
-const CD    = 0.08;
-const X_FOIL_AFT = 1.20;  // m, foil aft of CG — visual only; pitch is passively stabilized below
-const ALPHA_MAX = 15 * Math.PI/180;  // ±15° actuator clamp
-const TAU_D = 0.05;     // s, derivative low-pass time constant
-const DT_PHYS = 1/200;  // 200 Hz
+// --- Constants -----------------------------------------------------------
+const RHO     = 1025;     // water density [kg/m^3]
+const V       = 15;       // forward speed [m/s]
+const S       = 0.3;      // foil area [m^2]
+const CL_A    = 1.2;      // lift coefficient slope factor
+const MASS    = 800;      // [kg]  (per spec, denominator)
+const WEIGHT  = 9800;     // [N]   (per spec, numerator)
+const G_LIFT  = 0.5 * RHO * V * V * S * CL_A;   // Lift = G_LIFT * sin(angle)
+const H_TGT   = 0.5;      // target height [m]
+const DT      = 1 / 60;   // fixed step [s]
+const A_MAX   = 25 * Math.PI / 180; // foil angle clamp [rad]
 
-// Passive pitch stabilizer (models real hydrofoils' second foil / surface-piercing dihedral
-// / hull buoyancy contribution that statically balances the main foil's pitching moment).
-// Without this the system has no pitch equilibrium with L = mg and diverges nose-down.
-const K_PITCH = 6000;   // N·m/rad — restoring stiffness  (ω_n ≈ 3.2 rad/s)
-const C_PITCH = 1400;   // N·m·s/rad — damping            (ζ ≈ 0.37)
+// Feedforward: angle to hold steady at target (Lift = Weight)
+const TRIM = Math.asin(WEIGHT / G_LIFT);
 
-// Hull (water) forces — only when h < 0
-const K_BUOY  = 26000;  // N/m of submersion (static eq at ~0.30 m sunk)
-const C_HULL  = 3200;   // N·s/m vertical damping when wetted
-const K_HULL_PITCH = 4000;   // hull pitch restoring when wetted
-const C_HULL_PITCH = 1200;
+// PID gains (tuned on linearized plant: ~3 rad/s nat. freq, ~0.7 damping)
+const KP = 0.18;
+const KI = 0.05;
+const KD = 0.085;
+const I_MAX = 2.0;   // integral clamp [error·s]
 
-// ----- State -----
-const state = {
-  h: 0,        // hull bottom above water (m)
-  hdot: 0,
-  theta: 0,    // pitch (rad)
-  thetadot: 0,
-  alpha: 0,    // commanded foil angle (rad)
-  // PID memory
-  integ: 0,
-  dFiltered: 0,
-  prevErr: 0,
-  // Plant inputs / outputs
-  // v=14 m/s is above min foilborne speed (~13 m/s with α_max=15°); gives ~2.5° margin
-  v: 14,
-  hTarget: 0.4,
-  // Sea state
-  waveAmp: 0.15,
-  waveFreq: 0.6,
-  wavePhase: 0,
-  injectDecay: 0,   // exponentially decaying impulse vel
-  // PID gains (deg of foil per m of error / deg·s per m / deg per m/s)
-  // Tuned from linearized plant G_p ≈ 0.77 (m/s²)/deg via triple-pole at ω₀=1.5 rad/s
-  Kp: 9.0, Ki: 4.0, Kd: 6.0,
-  // Bookkeeping
-  t: 0,
-  paused: false,
-  // PID component history (last computed)
-  pTerm: 0, iTerm: 0, dTerm: 0,
-  // Plant readouts
-  lift: 0, drag: 0,
-  // Actuator saturation flag
-  satHi: false, satLo: false,
-};
-
-// ----- Telemetry buffer (10 s) -----
-const TELE_WINDOW = 10.0;
-const TELE_HZ = 100;
-const TELE_LEN = TELE_WINDOW * TELE_HZ;
-const tele = {
-  t: new Float32Array(TELE_LEN),
-  h: new Float32Array(TELE_LEN),
-  hTarget: new Float32Array(TELE_LEN),
-  alpha: new Float32Array(TELE_LEN),
-  P: new Float32Array(TELE_LEN),
-  I: new Float32Array(TELE_LEN),
-  D: new Float32Array(TELE_LEN),
-  idx: 0,
-  count: 0,
-};
-let teleAccum = 0;
-function pushTele(){
-  const i = tele.idx;
-  tele.t[i] = state.t;
-  tele.h[i] = state.h;
-  tele.hTarget[i] = state.hTarget;
-  tele.alpha[i] = state.alpha;
-  tele.P[i] = state.pTerm;
-  tele.I[i] = state.iTerm;
-  tele.D[i] = state.dTerm;
-  tele.idx = (i + 1) % TELE_LEN;
-  if (tele.count < TELE_LEN) tele.count++;
+// --- State ---------------------------------------------------------------
+let h, vH, integ, angle, simT;
+let waveAmp = 0;       // [m]   (from slider)
+let waveFreq = 0.5;    // [Hz]  (from slider)
+function reset() {
+  h = 0;
+  vH = 0;
+  integ = 0;
+  angle = 0;
+  simT = 0;
+  chartBuf.length = 0;
 }
 
-// =========================================================================
-// PHYSICS
-// =========================================================================
-// Derivatives function for RK4. State y = [h, hdot, theta, thetadot].
-//
-// Forces:
-//   Foil lift  L = 0.5·ρ·v²·A·CL·sin(α + θ + α_wave)
-//   Foil drag  D = 0.5·ρ·v²·A·CD·(1 + 4·sin²(α_eff))   (parasitic + induced)
-//   Hull buoyancy + heave damping when h < 0
-//
-// Moments about CG:
-//   Pitch is held by a passive stabilizer (K_PITCH·θ + C_PITCH·θ̇). This represents
-//   the combined static restoring effect of a second foil / dihedral / hull CB
-//   that any real hydrofoil has. Without it, a single aft foil produces an
-//   unbalanced -L·x_foil moment with no equilibrium — pitch runs away nose-down,
-//   sin(α+θ) flips, and lift goes negative.  Wave perturbations couple through
-//   AoA into lift and (via the small wave-induced moment arm) into pitch motion,
-//   so the pitch DOF still moves visibly with sea state.
-function deriv(y, t, alphaCmd){
-  const h = y[0], hdot = y[1], theta = y[2], thetadot = y[3];
-  const v = state.v;
-  const inWater = h < 0;
+// --- PID + physics step --------------------------------------------------
+function step() {
+  const err = H_TGT - h;
+  integ += err * DT;
+  if (integ >  I_MAX) integ =  I_MAX;
+  if (integ < -I_MAX) integ = -I_MAX;
+  // trim feedforward + PID; derivative on measurement avoids setpoint kicks
+  let u = TRIM + KP * err + KI * integ - KD * vH;
+  if (u >  A_MAX) u =  A_MAX;
+  if (u < -A_MAX) u = -A_MAX;
+  angle = u;
 
-  // Wave-induced vertical velocity at the foil, plus any injected impulse
-  const waveVel = state.waveAmp * Math.sin(2*Math.PI*state.waveFreq*t + state.wavePhase)
-                + state.injectDecay;
-  const aWave = Math.atan2(waveVel, v);   // AoA perturbation from wave
+  // continuous wave acceleration disturbance (water heaving the boat)
+  const omega = 2 * Math.PI * waveFreq;
+  const waveAcc = waveAmp * omega * omega * Math.sin(omega * simT);
 
-  // Foil aerodynamic forces — single AoA expression keeps signs unambiguous.
-  const aEff = alphaCmd + theta + aWave;
-  const q    = 0.5 * RHO * v*v * A_FOIL;
-  const L    = q * CL * Math.sin(aEff);
-  const sA   = Math.sin(aEff);
-  const D    = q * CD * (1 + 4*sA*sA);
-
-  // Vertical force balance
-  let Fz = L - M*G;
-  // Pitching moment: passive stabilizer + small wave-induced perturbation only.
-  // (Foil moment from steady L is absorbed into the passive trim; modelling it
-  // separately would require a second control surface that the spec doesn't have.)
-  let My = -K_PITCH*theta - C_PITCH*thetadot
-         - q*CL*Math.sin(aWave) * X_FOIL_AFT * 0.25;  // wave excites pitch a bit
-
-  // Hull contribution when wetted
-  if (inWater) {
-    const sub = Math.min(-h, 0.6);
-    Fz += K_BUOY*sub - C_HULL*hdot;
-    My += -K_HULL_PITCH*theta - C_HULL_PITCH*thetadot;
-  }
-
-  return [hdot, Fz/M, thetadot, My/I_YY];
+  const lift = G_LIFT * Math.sin(angle);
+  const a    = (lift - WEIGHT) / MASS + waveAcc;
+  vH += a * DT;
+  h  += vH * DT;
+  if (h < 0) { h = 0; if (vH < 0) vH = 0; }
+  simT += DT;
+  return lift;
 }
 
-// RK4 step
-function rk4Step(y, t, dt, alphaCmd){
-  const k1 = deriv(y, t, alphaCmd);
-  const y2 = [y[0]+0.5*dt*k1[0], y[1]+0.5*dt*k1[1], y[2]+0.5*dt*k1[2], y[3]+0.5*dt*k1[3]];
-  const k2 = deriv(y2, t+0.5*dt, alphaCmd);
-  const y3 = [y[0]+0.5*dt*k2[0], y[1]+0.5*dt*k2[1], y[2]+0.5*dt*k2[2], y[3]+0.5*dt*k2[3]];
-  const k3 = deriv(y3, t+0.5*dt, alphaCmd);
-  const y4 = [y[0]+dt*k3[0], y[1]+dt*k3[1], y[2]+dt*k3[2], y[3]+dt*k3[3]];
-  const k4 = deriv(y4, t+dt, alphaCmd);
-  return [
-    y[0] + dt/6 * (k1[0] + 2*k2[0] + 2*k3[0] + k4[0]),
-    y[1] + dt/6 * (k1[1] + 2*k2[1] + 2*k3[1] + k4[1]),
-    y[2] + dt/6 * (k1[2] + 2*k2[2] + 2*k3[2] + k4[2]),
-    y[3] + dt/6 * (k1[3] + 2*k2[3] + 2*k3[3] + k4[3]),
-  ];
-}
+// --- Rendering -----------------------------------------------------------
+const scene = document.getElementById("scene");
+const sctx  = scene.getContext("2d");
+const chart = document.getElementById("chart");
+const cctx  = chart.getContext("2d");
 
-// =========================================================================
-// CONTROLLER (PID)
-// =========================================================================
-// PID outputs foil angle (rad). Anti-windup: clamp integrator when actuator saturates.
-function controlStep(dt){
-  const err = state.hTarget - state.h;
-  // proportional
-  const P = state.Kp * err;
-
-  // derivative on error, low-pass filtered
-  const rawD = (err - state.prevErr) / Math.max(dt, 1e-6);
-  // alpha-LPF: y += (raw - y) * dt/tau
-  const a = dt / (TAU_D + dt);
-  state.dFiltered = state.dFiltered + (rawD - state.dFiltered) * a;
-  const D = state.Kd * state.dFiltered;
-  state.prevErr = err;
-
-  // Integrate, with conditional anti-windup
-  // First compute provisional integrator
-  const provisional = state.integ + state.Ki * err * dt;
-  const provisionalAlpha = (P + provisional + D) * (Math.PI/180); // gains in deg/m → rad
-  // Decide whether to back off integration (clamp)
-  const willSatHi = provisionalAlpha >  ALPHA_MAX;
-  const willSatLo = provisionalAlpha < -ALPHA_MAX;
-  // Standard conditional integration: only integrate if not pushing further into saturation
-  if ( (willSatHi && err > 0) || (willSatLo && err < 0) ) {
-    // hold integrator
-  } else {
-    state.integ = provisional;
-  }
-  const I = state.integ;
-
-  // Final unclamped command (in degrees), then clamp to actuator limit
-  const cmdDeg = P + I + D;
-  let alphaCmd = cmdDeg * Math.PI/180;
-  state.satHi = alphaCmd >  ALPHA_MAX;
-  state.satLo = alphaCmd < -ALPHA_MAX;
-  if (state.satHi) alphaCmd =  ALPHA_MAX;
-  if (state.satLo) alphaCmd = -ALPHA_MAX;
-  state.alpha = alphaCmd;
-
-  // store components in degrees for telemetry (more readable)
-  state.pTerm = P;
-  state.iTerm = I;
-  state.dTerm = D;
-}
-
-// =========================================================================
-// MAIN LOOP — physics @200 Hz, render @60
-// =========================================================================
-let lastWall = performance.now();
-let physAccum = 0;
-
-function step(){
-  if (state.paused) return;
-  const now = performance.now();
-  let dtWall = (now - lastWall) / 1000;
-  lastWall = now;
-  if (dtWall > 0.1) dtWall = 0.1; // clamp huge frame stalls
-
-  physAccum += dtWall;
-  while (physAccum >= DT_PHYS) {
-    // Controller runs at physics rate (cheap)
-    controlStep(DT_PHYS);
-
-    // Wave phase advance
-    state.wavePhase += 0; // already passing t
-    // Decay any injected impulse
-    state.injectDecay *= Math.exp(-DT_PHYS / 0.4);
-
-    let y = [state.h, state.hdot, state.theta, state.thetadot];
-    y = rk4Step(y, state.t, DT_PHYS, state.alpha);
-    state.h = y[0]; state.hdot = y[1]; state.theta = y[2]; state.thetadot = y[3];
-
-    // --- Water floor: hull cannot pass below the surface ---
-    // The foil can produce strong negative lift transiently (e.g. injected
-    // disturbance flips α_eff well negative), which previously dragged the hull
-    // through the water surface to ~−1.24 m. Treat the surface as a hard
-    // kinematic constraint: clamp h≥0, kill downward velocity, and apply
-    // heavy drag while the hull is in contact so the boat bobs rather than
-    // dives. Pitch is also damped while wetted.
-    if (state.h < 0) {
-      state.h = 0;
-      if (state.hdot < 0) state.hdot = 0;   // inelastic floor
-    }
-    if (state.h < 0.02) {                    // hull touching the water surface
-      state.hdot *= Math.exp(-DT_PHYS / 0.08);    // heavy heave drag (τ ≈ 80 ms)
-      state.thetadot *= Math.exp(-DT_PHYS / 0.15); // pitch damping in water
-    }
-
-    // Compute lift/drag readouts at this instant (includes wave perturbation,
-    // matching what deriv() actually applied)
-    const v  = state.v;
-    const q  = 0.5 * RHO * v*v * A_FOIL;
-    const wv = state.waveAmp * Math.sin(2*Math.PI*state.waveFreq*state.t + state.wavePhase)
-             + state.injectDecay;
-    const aEff = state.alpha + state.theta + Math.atan2(wv, v);
-    const sA = Math.sin(aEff);
-    state.lift = q * CL * sA;
-    state.drag = q * CD * (1 + 4*sA*sA);
-
-    state.t += DT_PHYS;
-    physAccum -= DT_PHYS;
-
-    // Telemetry sample
-    teleAccum += DT_PHYS;
-    if (teleAccum >= 1/TELE_HZ) { pushTele(); teleAccum = 0; }
-  }
-}
-
-// =========================================================================
-// CANVAS RENDERING
-// =========================================================================
-const boatCanvas = document.getElementById('boat-canvas');
-const boatCtx = boatCanvas.getContext('2d');
-const chartCanvas = document.getElementById('chart-canvas');
-const chartCtx = chartCanvas.getContext('2d');
-
-function fitCanvas(c){
-  const r = c.getBoundingClientRect();
+function fitCanvas(cv) {
   const dpr = window.devicePixelRatio || 1;
-  c.width = Math.max(1, Math.floor(r.width * dpr));
-  c.height = Math.max(1, Math.floor(r.height * dpr));
-  const ctx = c.getContext('2d');
-  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-  return { w: r.width, h: r.height };
-}
-
-// ---- Boat panel ----
-function drawBoat(){
-  const { w, h } = fitCanvas(boatCanvas);
-  const ctx = boatCtx;
-  ctx.clearRect(0, 0, w, h);
-
-  // Background gradient
-  const skyGrad = ctx.createLinearGradient(0, 0, 0, h);
-  skyGrad.addColorStop(0, '#0a1628');
-  skyGrad.addColorStop(0.55, '#0a1828');
-  skyGrad.addColorStop(0.55, '#040c1a');
-  skyGrad.addColorStop(1.0, '#020812');
-  ctx.fillStyle = skyGrad;
-  ctx.fillRect(0, 0, w, h);
-
-  // Reference grid (subtle)
-  ctx.strokeStyle = 'rgba(40,80,120,0.15)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let x=0; x<w; x+=40) { ctx.moveTo(x+0.5, 0); ctx.lineTo(x+0.5, h); }
-  for (let y=0; y<h; y+=40) { ctx.moveTo(0, y+0.5); ctx.lineTo(w, y+0.5); }
-  ctx.stroke();
-
-  // Geometry: scale meters to pixels
-  const PX_PER_M = Math.min(w, h) * 0.18;   // ~18% of smaller dim per meter
-  const cx = w * 0.42;
-  const waterY = h * 0.62;
-
-  // Water surface — animated
-  drawWater(ctx, w, h, waterY, PX_PER_M);
-
-  // Ruler (height measurement) on right
-  drawHeightRuler(ctx, w, h, waterY, PX_PER_M);
-
-  // Boat
-  const hPx = state.h * PX_PER_M;
-  const boatY = waterY - hPx;
-  const pitch = state.theta;
-
-  ctx.save();
-  ctx.translate(cx, boatY);
-  ctx.rotate(-pitch); // canvas Y inverted, so nose-up = ccw rotation
-  drawHull(ctx, PX_PER_M);
-  drawStrutAndFoil(ctx, PX_PER_M, state.alpha);
-  ctx.restore();
-
-  // Height measurement annotation line
-  drawHeightAnnotation(ctx, cx, boatY, waterY, PX_PER_M);
-
-  // Foil-borne / hull-borne band overlay
-  drawAltitudeBand(ctx, w, h, waterY, PX_PER_M);
-
-  // Speed vector arrow
-  drawSpeedArrow(ctx, w, h);
-}
-
-function drawWater(ctx, w, h, waterY, PX_PER_M){
-  // Sea fill
-  const seaGrad = ctx.createLinearGradient(0, waterY, 0, h);
-  seaGrad.addColorStop(0, 'rgba(20,60,100,0.55)');
-  seaGrad.addColorStop(1, 'rgba(2,10,20,0.95)');
-  ctx.fillStyle = seaGrad;
-  ctx.fillRect(0, waterY, w, h - waterY);
-
-  // Wave line — driven by sim time, amplitude/freq from inputs
-  ctx.strokeStyle = 'rgba(43,214,255,0.55)';
-  ctx.lineWidth = 1.4;
-  ctx.beginPath();
-  const A_px = state.waveAmp * 0.6 * PX_PER_M;     // visual scaling
-  const f = state.waveFreq;
-  const k = 2*Math.PI * f / 6.0; // spatial freq (visual)
-  for (let x=0; x<=w; x+=2) {
-    const yy = waterY + Math.sin(k*x + 2*Math.PI*f*state.t) * A_px;
-    if (x===0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+  const w = cv.clientWidth, hpx = cv.clientHeight;
+  if (cv.width !== w * dpr || cv.height !== hpx * dpr) {
+    cv.width  = w * dpr;
+    cv.height = hpx * dpr;
   }
-  ctx.stroke();
+  return { w, h: hpx, dpr };
+}
 
-  // Secondary wave (smaller, faster) for richer texture
-  ctx.strokeStyle = 'rgba(43,214,255,0.18)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let x=0; x<=w; x+=2) {
-    const yy = waterY + Math.sin(k*1.7*x + 2*Math.PI*f*1.6*state.t + 1.0) * A_px*0.4 + 4;
-    if (x===0) ctx.moveTo(x, yy); else ctx.lineTo(x, yy);
+function drawScene() {
+  const { w, h: H, dpr } = fitCanvas(scene);
+  sctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  sctx.clearRect(0, 0, w, H);
+
+  const waterY = H * 0.62;
+  const pxPerM = 80;
+
+  // sky background
+  sctx.fillStyle = "#07101a";
+  sctx.fillRect(0, 0, w, waterY);
+
+  // wave surface (animated sine; horizontal wavelength ~180 px, phase travels with t)
+  const ampPx = waveAmp * pxPerM;
+  const lambdaPx = 180;
+  const surfaceY = x =>
+    waterY - ampPx * Math.sin((x / lambdaPx) * 2 * Math.PI - 2 * Math.PI * waveFreq * simT);
+
+  // water fill below the surface
+  sctx.fillStyle = "#0a1822";
+  sctx.beginPath();
+  sctx.moveTo(0, surfaceY(0));
+  for (let x = 0; x <= w; x += 4) sctx.lineTo(x, surfaceY(x));
+  sctx.lineTo(w, H);
+  sctx.lineTo(0, H);
+  sctx.closePath();
+  sctx.fill();
+
+  // surface line
+  sctx.strokeStyle = "#1f3a4d";
+  sctx.lineWidth = 1;
+  sctx.beginPath();
+  for (let x = 0; x <= w; x += 4) {
+    const y = surfaceY(x);
+    if (x === 0) sctx.moveTo(x, y); else sctx.lineTo(x, y);
   }
-  ctx.stroke();
+  sctx.stroke();
+  const boatCx = w * 0.5;
+  const boatBaseY = waterY - h * pxPerM;
 
-  // Subtle foam highlights
-  ctx.fillStyle = 'rgba(180,230,255,0.05)';
-  for (let i=0; i<14; i++){
-    const x = ((i*73 + state.t*30) % w);
-    const yy = waterY + Math.sin(k*x + 2*Math.PI*f*state.t)*A_px + 3;
-    ctx.fillRect(x, yy, 18, 1);
+  // strut
+  const strutLen = 60;
+  const strutBot = boatBaseY + strutLen;
+  sctx.strokeStyle = "#4a6276";
+  sctx.lineWidth = 3;
+  sctx.beginPath();
+  sctx.moveTo(boatCx, boatBaseY);
+  sctx.lineTo(boatCx, strutBot);
+  sctx.stroke();
+
+  // foil (tilted by angle; positive angle => leading edge up)
+  const foilLen = 70;
+  sctx.save();
+  sctx.translate(boatCx, strutBot);
+  sctx.rotate(-angle);
+  sctx.strokeStyle = "#6ad0ff";
+  sctx.lineWidth = 4;
+  sctx.beginPath();
+  sctx.moveTo(-foilLen / 2, 0);
+  sctx.lineTo( foilLen / 2, 0);
+  sctx.stroke();
+  sctx.restore();
+
+  // hull silhouette
+  const hullW = 180, hullH = 36;
+  sctx.fillStyle = "#cfd8e3";
+  sctx.beginPath();
+  sctx.moveTo(boatCx - hullW / 2,      boatBaseY);
+  sctx.lineTo(boatCx + hullW / 2 - 18, boatBaseY);
+  sctx.lineTo(boatCx + hullW / 2,      boatBaseY - hullH * 0.55);
+  sctx.lineTo(boatCx + hullW / 2 - 6,  boatBaseY - hullH);
+  sctx.lineTo(boatCx - hullW / 2 + 12, boatBaseY - hullH);
+  sctx.closePath();
+  sctx.fill();
+
+  // target line
+  sctx.strokeStyle = "#ffb454";
+  sctx.setLineDash([4, 4]);
+  sctx.beginPath();
+  const tgtY = waterY - H_TGT * pxPerM;
+  sctx.moveTo(0, tgtY);
+  sctx.lineTo(w, tgtY);
+  sctx.stroke();
+  sctx.setLineDash([]);
+  sctx.fillStyle = "#ffb454";
+  sctx.font = "10px ui-monospace, monospace";
+  sctx.fillText("TGT 0.5 m", 8, tgtY - 4);
+  sctx.fillStyle = "#6b7a8a";
+  sctx.fillText("WATER", 8, waterY - 4);
+}
+
+// chart: ring buffer of height samples at fixed dt
+const CHART_SECONDS = 10;
+const CHART_LEN = Math.round(CHART_SECONDS / DT);
+const chartBuf = [];
+function pushChart(val) {
+  chartBuf.push(val);
+  if (chartBuf.length > CHART_LEN) chartBuf.shift();
+}
+function drawChart() {
+  const { w, h: H, dpr } = fitCanvas(chart);
+  cctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  cctx.clearRect(0, 0, w, H);
+
+  const yMin = -0.3, yMax = 1.0;
+  const y2px = v => H - ((v - yMin) / (yMax - yMin)) * H;
+
+  cctx.strokeStyle = "#162230";
+  cctx.lineWidth = 1;
+  cctx.beginPath();
+  for (let i = 0; i <= 4; i++) {
+    const y = (H / 4) * i;
+    cctx.moveTo(0, y); cctx.lineTo(w, y);
   }
-}
+  cctx.stroke();
 
-function drawHull(ctx, S){
-  // S = pixels per meter
-  // Draw hull centered at origin (origin = "hull bottom amidships")
-  // Hull is ~5m long, 1.4m tall above water
-  const L = 4.8 * S, H = 1.05 * S;
-  ctx.lineJoin = 'round';
-  ctx.lineCap = 'round';
+  cctx.strokeStyle = "#1f3a4d";
+  cctx.beginPath();
+  cctx.moveTo(0, y2px(0)); cctx.lineTo(w, y2px(0));
+  cctx.stroke();
 
-  // Hull body (shape: catamaran-ish profile)
-  ctx.beginPath();
-  ctx.moveTo(-L*0.45, 0);
-  ctx.bezierCurveTo(-L*0.55, -H*0.7, -L*0.45, -H*1.0, -L*0.20, -H*1.0);
-  ctx.lineTo( L*0.30, -H*1.0);
-  ctx.bezierCurveTo( L*0.55, -H*1.0, L*0.55, -H*0.5, L*0.45, -H*0.05);
-  ctx.lineTo( L*0.45, 0);
-  ctx.lineTo(-L*0.45, 0);
-  ctx.closePath();
+  cctx.strokeStyle = "#ffb454";
+  cctx.setLineDash([4, 4]);
+  cctx.beginPath();
+  cctx.moveTo(0, y2px(H_TGT)); cctx.lineTo(w, y2px(H_TGT));
+  cctx.stroke();
+  cctx.setLineDash([]);
 
-  ctx.fillStyle = '#14253a';
-  ctx.fill();
-  ctx.strokeStyle = 'rgba(43,214,255,0.85)';
-  ctx.lineWidth = 1.5;
-  ctx.stroke();
-
-  // Deck line
-  ctx.strokeStyle = 'rgba(43,214,255,0.35)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-L*0.42, -H*0.95);
-  ctx.lineTo( L*0.42, -H*0.95);
-  ctx.stroke();
-
-  // Cockpit / windscreen
-  ctx.fillStyle = 'rgba(93,255,177,0.15)';
-  ctx.strokeStyle = 'rgba(93,255,177,0.7)';
-  ctx.beginPath();
-  ctx.moveTo( L*0.12, -H*0.95);
-  ctx.lineTo( L*0.32, -H*1.0);
-  ctx.lineTo( L*0.30, -H*0.5);
-  ctx.lineTo( L*0.10, -H*0.5);
-  ctx.closePath();
-  ctx.fill();
-  ctx.stroke();
-
-  // Bow nav light
-  ctx.fillStyle = 'rgba(255,94,108,0.9)';
-  ctx.beginPath();
-  ctx.arc(L*0.45, -H*0.18, 2, 0, Math.PI*2);
-  ctx.fill();
-
-  // CG marker
-  ctx.strokeStyle = 'rgba(255,255,255,0.4)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.arc(0, -H*0.55, 4, 0, Math.PI*2);
-  ctx.moveTo(-6, -H*0.55); ctx.lineTo(6, -H*0.55);
-  ctx.moveTo(0, -H*0.55-6); ctx.lineTo(0, -H*0.55+6);
-  ctx.stroke();
-}
-
-function drawStrutAndFoil(ctx, S, alpha){
-  // Strut goes down from hull bottom (aft), foil at the bottom
-  const xStrut = X_FOIL_AFT * S * -1;       // foil is aft (negative x in our local frame, since +x is forward → bow)
-  // We chose bow = +x. Foil aft → -X_FOIL_AFT.
-  // Actually for clarity let's place at +0 ... hmm: hull origin is at "hull bottom amidships",
-  // and foil mounted via strut going down from a point aft of CG.
-  // In local frame, +x = forward. So foil mount = -X_FOIL_AFT*S along x.
-  const strutLen = 0.55 * S;
-
-  // Strut (vertical in BODY frame, so it tilts with pitch — but we already rotated)
-  ctx.strokeStyle = 'rgba(43,214,255,0.95)';
-  ctx.lineWidth = 2.5;
-  ctx.beginPath();
-  ctx.moveTo(xStrut, 0);
-  ctx.lineTo(xStrut, strutLen);
-  ctx.stroke();
-
-  // Foil mount circle
-  ctx.fillStyle = 'var(--bg-deep)';
-  ctx.fillStyle = '#0a1628';
-  ctx.beginPath();
-  ctx.arc(xStrut, strutLen, 4, 0, Math.PI*2);
-  ctx.fill();
-  ctx.strokeStyle = 'var(--cyan)';
-  ctx.strokeStyle = '#2bd6ff';
-  ctx.lineWidth = 1.2;
-  ctx.stroke();
-
-  // Foil — rotated by alpha around mount
-  const foilLen = 0.9 * S;
-  ctx.save();
-  ctx.translate(xStrut, strutLen);
-  ctx.rotate(-alpha);  // alpha positive = leading edge up
-  // Foil shape (airfoil-ish)
-  ctx.beginPath();
-  ctx.moveTo(-foilLen*0.6, 0);
-  ctx.bezierCurveTo(-foilLen*0.4, -3, foilLen*0.3, -3, foilLen*0.4, 0);
-  ctx.bezierCurveTo(foilLen*0.3,  3, -foilLen*0.4, 3, -foilLen*0.6, 0);
-  ctx.closePath();
-  ctx.fillStyle = '#ffb547';
-  ctx.fill();
-  ctx.strokeStyle = '#ffd384';
-  ctx.lineWidth = 1;
-  ctx.stroke();
-
-  // Lift vector arrow up from foil
-  const liftMag = Math.max(-1, Math.min(1, state.lift / (M*G*1.5))); // normalized
-  if (Math.abs(liftMag) > 0.02){
-    const arrowLen = 38 * Math.abs(liftMag);
-    const dir = liftMag > 0 ? -1 : 1;
-    ctx.strokeStyle = liftMag > 0 ? 'rgba(93,255,177,0.9)' : 'rgba(255,94,108,0.9)';
-    ctx.fillStyle = ctx.strokeStyle;
-    ctx.lineWidth = 1.5;
-    ctx.beginPath();
-    ctx.moveTo(0, 0);
-    ctx.lineTo(0, dir * arrowLen);
-    ctx.stroke();
-    // arrowhead
-    ctx.beginPath();
-    ctx.moveTo(0, dir * arrowLen);
-    ctx.lineTo(-4, dir * (arrowLen-6));
-    ctx.lineTo( 4, dir * (arrowLen-6));
-    ctx.closePath();
-    ctx.fill();
+  cctx.strokeStyle = "#6ad0ff";
+  cctx.lineWidth = 1.5;
+  cctx.beginPath();
+  const n = chartBuf.length;
+  for (let i = 0; i < n; i++) {
+    const x = (i / (CHART_LEN - 1)) * w;
+    const y = y2px(chartBuf[i]);
+    if (i === 0) cctx.moveTo(x, y); else cctx.lineTo(x, y);
   }
-  ctx.restore();
-
-  // Reference horizontal line through foil mount (dashed) to show actual deflection visually
-  ctx.save();
-  ctx.translate(xStrut, strutLen);
-  ctx.setLineDash([3, 3]);
-  ctx.strokeStyle = 'rgba(255,255,255,0.18)';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  ctx.moveTo(-foilLen*0.7, 0);
-  ctx.lineTo( foilLen*0.5, 0);
-  ctx.stroke();
-  ctx.setLineDash([]);
-  ctx.restore();
+  cctx.stroke();
 }
 
-function drawHeightAnnotation(ctx, cx, boatY, waterY, S){
-  // Vertical measurement line from hull bottom to water surface
-  ctx.save();
-  ctx.strokeStyle = 'rgba(93,255,177,0.6)';
-  ctx.lineWidth = 1;
-  ctx.setLineDash([4,3]);
-  const x = cx + 90;
-  ctx.beginPath();
-  ctx.moveTo(x, boatY);
-  ctx.lineTo(x, waterY);
-  ctx.stroke();
-  ctx.setLineDash([]);
+// --- UI bindings ---------------------------------------------------------
+const elH = document.getElementById("vH");
+const elA = document.getElementById("vA");
+const elL = document.getElementById("vL");
+const elStatus = document.getElementById("status");
 
-  // ticks
-  ctx.beginPath();
-  ctx.moveTo(x-6, boatY); ctx.lineTo(x+6, boatY);
-  ctx.moveTo(x-6, waterY); ctx.lineTo(x+6, waterY);
-  ctx.stroke();
-
-  // label
-  ctx.fillStyle = 'rgba(93,255,177,0.95)';
-  ctx.font = '600 11px "JetBrains Mono", monospace';
-  const mid = (boatY + waterY) / 2;
-  ctx.textAlign = 'left';
-  ctx.fillText(`h = ${state.h.toFixed(2)} m`, x + 10, mid + 4);
-  ctx.restore();
-}
-
-function drawHeightRuler(ctx, w, h, waterY, S){
-  ctx.save();
-  const x = w - 38;
-  ctx.strokeStyle = 'rgba(93,255,177,0.35)';
-  ctx.fillStyle = 'rgba(150,180,200,0.55)';
-  ctx.font = '9.5px "JetBrains Mono", monospace';
-  ctx.lineWidth = 1;
-  for (let m=-1; m<=2; m+=0.25){
-    const yy = waterY - m*S;
-    if (yy < 6 || yy > h - 6) continue;
-    const major = (Math.abs(m % 0.5) < 1e-3);
-    ctx.beginPath();
-    ctx.moveTo(x, yy);
-    ctx.lineTo(x + (major? 10 : 5), yy);
-    ctx.stroke();
-    if (major){
-      ctx.fillText(`${m.toFixed(1)}m`, x + 14, yy + 3);
-    }
-  }
-  // target marker
-  const tY = waterY - state.hTarget * S;
-  ctx.strokeStyle = 'rgba(93,255,177,0.9)';
-  ctx.fillStyle = 'rgba(93,255,177,0.9)';
-  ctx.lineWidth = 1.5;
-  ctx.beginPath();
-  ctx.moveTo(x - 14, tY);
-  ctx.lineTo(x, tY);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x - 16, tY - 4);
-  ctx.lineTo(x - 16, tY + 4);
-  ctx.lineTo(x - 12, tY);
-  ctx.closePath();
-  ctx.fill();
-  ctx.restore();
-}
-
-function drawAltitudeBand(ctx, w, h, waterY, S){
-  // Show target band ±5cm
-  const yTop = waterY - (state.hTarget + 0.05)*S;
-  const yBot = waterY - (state.hTarget - 0.05)*S;
-  ctx.fillStyle = 'rgba(93,255,177,0.06)';
-  ctx.fillRect(0, yTop, w - 38, yBot - yTop);
-}
-
-function drawSpeedArrow(ctx, w, h){
-  // Bottom-left: forward speed indicator
-  const x0 = 16, y0 = h - 26;
-  ctx.strokeStyle = 'rgba(43,214,255,0.7)';
-  ctx.fillStyle = 'rgba(43,214,255,0.7)';
-  ctx.lineWidth = 1.5;
-  const len = 30 + state.v * 5;
-  ctx.beginPath();
-  ctx.moveTo(x0, y0);
-  ctx.lineTo(x0 + len, y0);
-  ctx.stroke();
-  ctx.beginPath();
-  ctx.moveTo(x0+len, y0);
-  ctx.lineTo(x0+len-7, y0-4);
-  ctx.lineTo(x0+len-7, y0+4);
-  ctx.closePath();
-  ctx.fill();
-  ctx.font = '10.5px "JetBrains Mono", monospace';
-  ctx.fillStyle = 'rgba(150,180,200,0.7)';
-  ctx.textAlign = 'left';
-  ctx.fillText('V →', x0, y0 - 8);
-}
-
-// ---- Charts panel ----
-// Three stacked sub-charts: height, alpha, PID components
-function drawCharts(){
-  const { w, h } = fitCanvas(chartCanvas);
-  const ctx = chartCtx;
-  ctx.clearRect(0, 0, w, h);
-
-  ctx.fillStyle = '#060e18';
-  ctx.fillRect(0, 0, w, h);
-
-  const padL = 56, padR = 18, padT = 10, padB = 18;
-  const innerW = w - padL - padR;
-  const totalH = h - padT - padB;
-  const gap = 12;
-  const rowH = (totalH - gap*2) / 3;
-
-  drawSubChart(ctx, padL, padT,                innerW, rowH, 'HEIGHT (m)', 'h',
-    [-0.2, 1.0],
-    [{ key: 'h', color: '#5dffb1', width: 2.0 },
-     { key: 'hTarget', color: 'rgba(255,255,255,0.55)', width: 1.2, dash: [4,3] }],
-    /*formatY*/ v => v.toFixed(2));
-
-  drawSubChart(ctx, padL, padT + rowH + gap,   innerW, rowH, 'FOIL ANGLE α (°)', 'α',
-    [-18, 18],
-    [{ key: 'alphaDeg', color: '#ffb547', width: 1.8 }],
-    v => v.toFixed(1));
-
-  drawSubChart(ctx, padL, padT + (rowH+gap)*2, innerW, rowH, 'PID COMPONENTS (°)', 'PID',
-    [-25, 25],
-    [{ key: 'P', color: '#2bd6ff', width: 1.5 },
-     { key: 'I', color: '#ff7ad9', width: 1.5 },
-     { key: 'D', color: '#b58cff', width: 1.5 }],
-    v => v.toFixed(1));
-}
-
-function drawSubChart(ctx, x, y, w, h, title, tag, yRange, series, fmtY){
-  // panel bg
-  ctx.fillStyle = '#08111e';
-  ctx.fillRect(x, y, w, h);
-  // border
-  ctx.strokeStyle = '#15243a';
-  ctx.lineWidth = 1;
-  ctx.strokeRect(x+0.5, y+0.5, w-1, h-1);
-
-  // grid
-  ctx.strokeStyle = '#11203a';
-  ctx.lineWidth = 1;
-  ctx.beginPath();
-  for (let i=1; i<5; i++){
-    const yy = y + (h*i/5);
-    ctx.moveTo(x, yy); ctx.lineTo(x+w, yy);
-  }
-  // x grid (1s spacings)
-  const tEnd = state.t;
-  const tStart = tEnd - TELE_WINDOW;
-  for (let s=Math.ceil(tStart); s<=Math.floor(tEnd); s++){
-    const xx = x + ((s - tStart)/TELE_WINDOW) * w;
-    ctx.moveTo(xx, y); ctx.lineTo(xx, y+h);
-  }
-  ctx.stroke();
-
-  // zero line (highlighted)
-  if (yRange[0] < 0 && yRange[1] > 0){
-    const yZero = mapY(0, yRange, y, h);
-    ctx.strokeStyle = 'rgba(150,180,210,0.25)';
-    ctx.lineWidth = 1;
-    ctx.beginPath();
-    ctx.moveTo(x, yZero); ctx.lineTo(x+w, yZero);
-    ctx.stroke();
-  }
-
-  // y-axis ticks/labels
-  ctx.fillStyle = '#5d7a9c';
-  ctx.font = '10px "JetBrains Mono", monospace';
-  ctx.textAlign = 'right';
-  ctx.textBaseline = 'middle';
-  const N = 5;
-  for (let i=0; i<=N; i++){
-    const v = yRange[0] + (yRange[1] - yRange[0]) * (i/N);
-    const yy = mapY(v, yRange, y, h);
-    ctx.fillText(fmtY(v), x - 6, yy);
-  }
-
-  // x-axis ticks (s ago)
-  ctx.textAlign = 'center';
-  ctx.textBaseline = 'top';
-  for (let i=0; i<=5; i++){
-    const xx = x + (w*i/5);
-    const ago = TELE_WINDOW * (1 - i/5);
-    ctx.fillText(`-${ago.toFixed(0)}s`, xx, y + h + 2);
-  }
-
-  // title
-  ctx.fillStyle = '#93afd1';
-  ctx.font = '600 9.5px "Inter", system-ui, sans-serif';
-  ctx.textAlign = 'left'; ctx.textBaseline = 'top';
-  ctx.fillText(title, x + 8, y + 6);
-
-  // Plot series
-  ctx.save();
-  ctx.beginPath();
-  ctx.rect(x, y, w, h);
-  ctx.clip();
-
-  const N_SAMPLES = tele.count;
-  if (N_SAMPLES > 1) {
-    for (const s of series){
-      ctx.strokeStyle = s.color;
-      ctx.lineWidth = s.width || 1.5;
-      if (s.dash) ctx.setLineDash(s.dash); else ctx.setLineDash([]);
-      ctx.beginPath();
-      let first = true;
-      for (let i=0; i<N_SAMPLES; i++){
-        // walk from oldest to newest
-        const idx = (tele.idx - N_SAMPLES + i + TELE_LEN) % TELE_LEN;
-        const tt = tele.t[idx];
-        if (tt < tStart) continue;
-        let val;
-        switch(s.key){
-          case 'h': val = tele.h[idx]; break;
-          case 'hTarget': val = tele.hTarget[idx]; break;
-          case 'alphaDeg': val = tele.alpha[idx] * 180/Math.PI; break;
-          case 'P': val = tele.P[idx]; break;
-          case 'I': val = tele.I[idx]; break;
-          case 'D': val = tele.D[idx]; break;
-        }
-        const xx = x + ((tt - tStart)/TELE_WINDOW) * w;
-        const yy = mapY(val, yRange, y, h);
-        if (first){ ctx.moveTo(xx, yy); first = false; }
-        else ctx.lineTo(xx, yy);
-      }
-      ctx.stroke();
-    }
-  }
-  ctx.setLineDash([]);
-  ctx.restore();
-}
-
-function mapY(v, range, y0, h){
-  const t = (v - range[0]) / (range[1] - range[0]);
-  return y0 + h - t*h;
-}
-
-// =========================================================================
-// HUD UPDATES
-// =========================================================================
-const $ = id => document.getElementById(id);
-function updateHUD(){
-  $('hud-h').textContent     = state.h.toFixed(2);
-  $('hud-theta').textContent = (state.theta * 180/Math.PI).toFixed(1);
-  $('hud-hdot').textContent  = state.hdot.toFixed(2);
-  $('hud-alpha').textContent = (state.alpha * 180/Math.PI).toFixed(1);
-  $('hud-lift').textContent  = (state.lift / 1000).toFixed(2);
-  $('hud-speed').textContent = state.v.toFixed(1);
-
-  $('r-lift').textContent = (state.lift / 1000).toFixed(3);
-  $('r-drag').textContent = (state.drag / 1000).toFixed(3);
-  $('r-p').textContent    = state.pTerm.toFixed(2);
-  $('r-i').textContent    = state.iTerm.toFixed(2);
-  $('r-d').textContent    = state.dTerm.toFixed(2);
-
-  // Sim time clock
-  const t = state.t;
-  const mm = Math.floor(t / 60).toString().padStart(2,'0');
-  const ss = (t % 60).toFixed(2).padStart(5,'0');
-  $('sim-time').textContent = `${mm}:${ss}`;
-
-  // Status pill: with water floor, h≥0 always, so HULL-BORNE means "in contact
-  // with the surface" (h within ~2 cm of waterline).
-  const fb = state.h > 0.10;
-  const hb = state.h < 0.02;
-  const tr = !fb && !hb;
-  setActive('pill-hull', hb, 'hull');
-  setActive('pill-trans', tr, 'trans');
-  setActive('pill-foil', fb, 'foil');
-
-  // Wallclock
-  const d = new Date();
-  $('wallclock').textContent =
-    d.toLocaleTimeString('en-US', { hour12: false });
-}
-function setActive(id, isActive, mod){
-  const el = document.getElementById(id);
-  el.classList.toggle('active', isActive);
-  el.classList.toggle(mod, true);
-}
-
-// =========================================================================
-// RENDER LOOP @60
-// =========================================================================
-function renderLoop(){
-  step();
-  drawBoat();
-  drawCharts();
-  updateHUD();
-  requestAnimationFrame(renderLoop);
-}
-
-// =========================================================================
-// CONTROLS WIRING
-// =========================================================================
-function bindSlider(id, key, fmt, transform){
-  const el = $(id);
-  const valEl = $(id + '-val');
-  const update = () => {
-    const raw = parseFloat(el.value);
-    const v = transform ? transform(raw) : raw;
-    state[key] = v;
-    valEl.textContent = fmt(raw);
-  };
-  el.addEventListener('input', update);
-  update();
-}
-
-bindSlider('kp', 'Kp', v => v.toFixed(1));
-bindSlider('ki', 'Ki', v => v.toFixed(1));
-bindSlider('kd', 'Kd', v => v.toFixed(1));
-bindSlider('speed', 'v', v => v.toFixed(1) + ' m/s');
-bindSlider('target', 'hTarget', v => v.toFixed(2) + ' m');
-bindSlider('wave-amp', 'waveAmp', v => v.toFixed(2) + ' m/s');
-bindSlider('wave-freq', 'waveFreq', v => v.toFixed(2) + ' Hz');
-
-$('btn-disturb').addEventListener('click', () => {
-  state.injectDecay = -1.5;  // sharp downward gust on the foil
+document.getElementById("btnReset").addEventListener("click", reset);
+document.getElementById("btnDisturb").addEventListener("click", () => {
+  h -= 0.2;
+  if (h < 0) h = 0;
 });
 
-document.querySelectorAll('[data-preset]').forEach(b => {
-  b.addEventListener('click', () => applyPreset(b.dataset.preset));
-});
-function applyPreset(name){
-  // Stable: verified by mental simulation against the actual plant with the
-  // water floor. Equilibrium foil angle for L=mg at v=14 is ~12.5°. With Kp=8
-  // the proportional term contributes 3.2° at err=0.4 m, and the integrator
-  // (Ki=4) winds the remaining ~9° in ~5.5 s — boat lifts off, then settles
-  // with no overshoot (closed-loop ζ ≈ 0.79, slowest pole −0.85 rad/s).
-  // Kp=2, Ki=0.5, Kd=3 was the suggested starting point but does not
-  // converge: integrator needs ~58 s to reach equilibrium α — unusable.
-  const presets = {
-    stable:   { Kp:  8.0, Ki:  4.0, Kd: 5.0 },
-    under:    { Kp: 14.0, Ki:  6.0, Kd: 0.8 },
-    unstable: { Kp: 32.0, Ki: 16.0, Kd: 0.1 },
-  };
-  const p = presets[name]; if (!p) return;
-  // Drive sliders via dispatched 'input' events so bindSlider() is the single
-  // source of truth that updates state. Avoids any chance of state desync.
-  const sliders = [['kp', p.Kp], ['ki', p.Ki], ['kd', p.Kd]];
-  for (const [id, v] of sliders) {
-    const el = $(id);
-    el.value = v;
-    el.dispatchEvent(new Event('input'));
-  }
-  state.integ = 0;            // wipe windup for a clean demo
-  state.dFiltered = 0;
-  state.prevErr = state.hTarget - state.h;
+const sAmp  = document.getElementById("wAmp");
+const sFreq = document.getElementById("wFreq");
+const lAmp  = document.getElementById("wAmpV");
+const lFreq = document.getElementById("wFreqV");
+function syncWave() {
+  waveAmp  = parseFloat(sAmp.value);
+  waveFreq = parseFloat(sFreq.value);
+  lAmp.textContent  = waveAmp.toFixed(2) + " m";
+  lFreq.textContent = waveFreq.toFixed(2) + " Hz";
 }
+sAmp.addEventListener("input", syncWave);
+sFreq.addEventListener("input", syncWave);
+syncWave();
 
-$('btn-pause').addEventListener('click', () => {
-  state.paused = !state.paused;
-  $('btn-pause').textContent = state.paused ? 'Resume' : 'Pause';
-  if (!state.paused) lastWall = performance.now();
-});
-$('btn-reset').addEventListener('click', () => {
-  state.h = 0; state.hdot = 0; state.theta = 0; state.thetadot = 0;
-  state.integ = 0; state.dFiltered = 0;
-  state.prevErr = state.hTarget - state.h;   // avoid initial derivative spike
-  state.t = 0; state.injectDecay = 0;
-  tele.idx = 0; tele.count = 0;
-});
+// --- Main loop (fixed-step accumulator) ----------------------------------
+reset();
+let last = performance.now();
+let acc = 0;
+const LIFT_AVG_N = 10;
+const liftHist = [];
+function frame(now) {
+  const dt = Math.min(0.1, (now - last) / 1000);
+  last = now;
+  acc += dt;
+  while (acc >= DT) {
+    step();
+    pushChart(h);
+    acc -= DT;
+  }
+  // display lift from current angle (independent of whether a step ran this frame)
+  const liftNow = G_LIFT * Math.sin(angle);
+  liftHist.push(liftNow);
+  if (liftHist.length > LIFT_AVG_N) liftHist.shift();
+  let liftAvg = 0;
+  for (let i = 0; i < liftHist.length; i++) liftAvg += liftHist[i];
+  liftAvg /= liftHist.length;
 
-// Resize handling — canvases are fit on each frame, but force redraw on resize
-window.addEventListener('resize', () => { /* fitCanvas runs each frame */ });
+  elH.textContent = h.toFixed(2) + " m";
+  elA.textContent = (angle * 180 / Math.PI).toFixed(1) + "°";
+  elL.textContent = Math.round(liftAvg) + " N";
+  const foilborne = h > 0.05;
+  elStatus.textContent = foilborne ? "FOILBORNE" : "HULL-BORNE";
+  elStatus.className = "badge " + (foilborne ? "foil" : "hull");
 
-// Kick off
-requestAnimationFrame(renderLoop);
+  drawScene();
+  drawChart();
+  requestAnimationFrame(frame);
+}
+requestAnimationFrame(frame);
 </script>
 </body>
 </html>
