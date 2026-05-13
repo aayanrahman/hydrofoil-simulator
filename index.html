@@ -109,6 +109,23 @@
       <div class="lbl"><span>WAVE FREQUENCY</span><span class="val" id="wFreqV">0.50 Hz</span></div>
       <input type="range" id="wFreq" min="0.1" max="1" step="0.05" value="0.5">
     </div>
+    <div class="ctrl">
+      <div class="lbl"><span>KP</span><span class="val" id="kpV">0.180</span></div>
+      <input type="range" id="kpS" min="0" max="30" step="0.01" value="0.18">
+    </div>
+    <div class="ctrl">
+      <div class="lbl"><span>KI</span><span class="val" id="kiV">0.050</span></div>
+      <input type="range" id="kiS" min="0" max="5" step="0.01" value="0.05">
+    </div>
+    <div class="ctrl">
+      <div class="lbl"><span>KD</span><span class="val" id="kdV">0.085</span></div>
+      <input type="range" id="kdS" min="0" max="20" step="0.01" value="0.085">
+    </div>
+    <div class="row" style="gap: 6px;">
+      <button id="btnStable">STABLE</button>
+      <button id="btnUnder">UNDERDAMPED</button>
+      <button id="btnUnstable">UNSTABLE</button>
+    </div>
   </div>
 
   <div class="panel">
@@ -133,15 +150,18 @@ const WEIGHT  = 9800;     // [N]   (per spec, numerator)
 const G_LIFT  = 0.5 * RHO * V * V * S * CL_A;   // Lift = G_LIFT * sin(angle)
 const H_TGT   = 0.5;      // target height [m]
 const DT      = 1 / 60;   // fixed step [s]
-const A_MAX   = 25 * Math.PI / 180; // foil angle clamp [rad]
+const A_MAX   = 35 * Math.PI / 180; // foil angle clamp [rad]
 
 // Feedforward: angle to hold steady at target (Lift = Weight)
 const TRIM = Math.asin(WEIGHT / G_LIFT);
 
 // PID gains (tuned on linearized plant: ~3 rad/s nat. freq, ~0.7 damping)
-const KP = 0.18;
-const KI = 0.05;
-const KD = 0.085;
+let KP = 0.18;
+let KI = 0.05;
+let KD = 0.085;
+const KP_DEFAULT = 0.18;
+const KI_DEFAULT = 0.05;
+const KD_DEFAULT = 0.085;
 const I_MAX = 2.0;   // integral clamp [error·s]
 
 // --- State ---------------------------------------------------------------
@@ -364,12 +384,55 @@ sAmp.addEventListener("input", syncWave);
 sFreq.addEventListener("input", syncWave);
 syncWave();
 
+const sKp = document.getElementById("kpS");
+const sKi = document.getElementById("kiS");
+const sKd = document.getElementById("kdS");
+const lKp = document.getElementById("kpV");
+const lKi = document.getElementById("kiV");
+const lKd = document.getElementById("kdV");
+function syncGains() {
+  KP = parseFloat(sKp.value);
+  KI = parseFloat(sKi.value);
+  KD = parseFloat(sKd.value);
+  lKp.textContent = KP.toFixed(3);
+  lKi.textContent = KI.toFixed(3);
+  lKd.textContent = KD.toFixed(3);
+}
+sKp.addEventListener("input", syncGains);
+sKi.addEventListener("input", syncGains);
+sKd.addEventListener("input", syncGains);
+syncGains();
+
+function applyPreset(kp, ki, kd) {
+  sKp.value = kp;
+  sKi.value = ki;
+  sKd.value = kd;
+  syncGains();
+  sAmp.value = 0.15;
+  syncWave();
+}
+document.getElementById("btnStable").addEventListener("click",
+  () => { applyPreset(8, 1.5, 10); reset(); });
+document.getElementById("btnUnder").addEventListener("click",
+  () => applyPreset(5, 0.1, 0.3));
+document.getElementById("btnUnstable").addEventListener("click",
+  () => applyPreset(10, 2, 0));
+
 // --- Main loop (fixed-step accumulator) ----------------------------------
 reset();
 let last = performance.now();
 let acc = 0;
-const LIFT_AVG_N = 10;
+const DISP_AVG_N = 10;
 const liftHist = [];
+const hHist = [];
+const angleHist = [];
+function rollAvg(arr, val) {
+  arr.push(val);
+  if (arr.length > DISP_AVG_N) arr.shift();
+  let s = 0;
+  for (let i = 0; i < arr.length; i++) s += arr[i];
+  return s / arr.length;
+}
 function frame(now) {
   const dt = Math.min(0.1, (now - last) / 1000);
   last = now;
@@ -381,14 +444,12 @@ function frame(now) {
   }
   // display lift from current angle (independent of whether a step ran this frame)
   const liftNow = G_LIFT * Math.sin(angle);
-  liftHist.push(liftNow);
-  if (liftHist.length > LIFT_AVG_N) liftHist.shift();
-  let liftAvg = 0;
-  for (let i = 0; i < liftHist.length; i++) liftAvg += liftHist[i];
-  liftAvg /= liftHist.length;
+  const liftAvg  = rollAvg(liftHist,  liftNow);
+  const hAvg     = rollAvg(hHist,     h);
+  const angleAvg = rollAvg(angleHist, angle);
 
-  elH.textContent = h.toFixed(2) + " m";
-  elA.textContent = (angle * 180 / Math.PI).toFixed(1) + "°";
+  elH.textContent = hAvg.toFixed(2) + " m";
+  elA.textContent = (angleAvg * 180 / Math.PI).toFixed(1) + "°";
   elL.textContent = Math.round(liftAvg) + " N";
   const foilborne = h > 0.05;
   elStatus.textContent = foilborne ? "FOILBORNE" : "HULL-BORNE";
